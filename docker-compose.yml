@@ -1,0 +1,22 @@
+version: "3.7"
+
+services:
+  db:
+    container_name: api_postgres
+    image: postgres:11-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: root
+      POSTGRES_DB: api_db
+    volumes:
+      - ./docker/dumps:/docker-entrypoint-initdb.d/
+    ports:
+      - 5460:5432
+
+  redis:
+    container_name: api_redis
+    image: redis:5-alpine
+    restart: always
+    ports:
+      - 6390:6379
