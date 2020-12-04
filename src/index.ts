@@ -1,49 +1,48 @@
 import Koa from 'koa';
 import cors from '@koa/cors';
-import logger from 'koa-pino-logger';
 import bodyparser from 'koa-bodyparser';
 
-import {patchQs} from './utils/qs';
-
 import {config} from './config';
+import {createKoaLogger} from './lib/logger';
+
 import {catchError} from './middlewares/error';
 import {initConnections} from './loader/connections';
 
+import {routes} from './api';
+
 class Server {
-    app: Koa;
+    readonly app = new Koa();
+    private readonly koaLogger = createKoaLogger();
 
     constructor() {
-        this.app = new Koa();
-        patchQs(this.app);
     }
 
-    private async initAsync() {
-        await initConnections();
-
-        this.app.use(logger({
-            prettyPrint: {
-                colorize: true,
-                translateTime: true,
-            },
-        }));
-
-        this.app.use(catchError);
-
-        this.app.use(bodyparser());
-
-        this.app.use(cors(config.cors));
-
-        this.app.listen(config.node.port);
+    private get logger() {
+        return this.koaLogger.logger;
     }
 
-    init() {
-        this.initAsync().then(() => {
-            console.log(`Server is running on port ${config.node.port}\n`);
-        }).catch((e) => {
-            console.log(e.message);
-        });
+    async init() {
+        try {
+            await initConnections();
+
+            this.app.use(this.koaLogger);
+
+            this.app.use(catchError);
+
+            this.app.use(bodyparser());
+
+            this.app.use(cors(config.cors));
+
+            this.app.use(routes);
+
+            this.app.listen(config.node.port);
+
+            this.logger.info(`Server is running on port ${config.node.port}\n`);
+        } catch (e) {
+            this.logger.error(e);
+        }
     }
 }
 
 export const server = new Server();
-server.init();
+server.init().then();
