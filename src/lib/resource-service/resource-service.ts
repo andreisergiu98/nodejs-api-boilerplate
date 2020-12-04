@@ -5,11 +5,44 @@ import {DbClient} from '../db-client';
 import {AppError} from '../app-error';
 import {HandleDbQueryError} from './resource-service-utils';
 
-export class ResourceService<T> {
+export class BaseService<T> {
     constructor(
-        private readonly db: DbClient,
-        private readonly targetEntity: EntityTarget<T>
+        protected readonly db: DbClient,
+        protected readonly targetEntity: EntityTarget<T>
     ) {
+    }
+
+    protected async existsById(id: number) {
+        const select = this.db.manager
+            .createQueryBuilder()
+            .select('*')
+            .from(this.targetEntity, 'entity')
+            .where('entity.id = $1')
+            .getQuery();
+
+        const existsQuery = `select exists(${select})`;
+
+        const res = await this.db.manager.query(existsQuery, [id]);
+        return res?.[0]?.exists === true;
+    }
+
+    protected get namespace() {
+        return this.db.connection.getMetadata(this.targetEntity).tableName;
+    }
+
+    protected deleteIdFromPayload(payload: T | QueryDeepPartialEntity<T>) {
+        // Make sure id is not changed
+        delete (payload as any).id;
+        return payload;
+    }
+}
+
+export class ResourceService<T> extends BaseService<T> {
+    constructor(
+        protected readonly db: DbClient,
+        protected readonly targetEntity: EntityTarget<T>
+    ) {
+        super(db, targetEntity);
     }
 
     async getById(id: number, options?: FindOneOptions<T>) {
@@ -43,27 +76,29 @@ export class ResourceService<T> {
     }
 
     @HandleDbQueryError()
-    async updateMany(payload: T[]) {
-        return this.db.manager.save(this.targetEntity, payload, {
-            chunk: 10000,
-        });
-    }
-
-    @HandleDbQueryError()
     async patch(id: number, payload: QueryDeepPartialEntity<T>) {
         const exists = await this.existsById(id);
         if (!exists) {
             throw new AppError(404, `Entity doesn't exist`, this.namespace);
         }
 
+        const properties = this.deleteIdFromPayload(payload);
+
         return this.db.manager
             .createQueryBuilder()
             .update(this.targetEntity)
             .where('id = :id', {id})
-            .set(payload)
+            .set(properties)
             .returning('*')
             .execute()
             .then(res => res.raw[0]);
+    }
+
+    @HandleDbQueryError()
+    async updateMany(payload: T[]) {
+        return this.db.manager.save(this.targetEntity, payload, {
+            chunk: 10000,
+        });
     }
 
     async delete(id: number) {
@@ -79,23 +114,5 @@ export class ResourceService<T> {
             .from(this.targetEntity)
             .where('id = :id', {id})
             .execute();
-    }
-
-    protected async existsById(id: number) {
-        const select = this.db.manager
-            .createQueryBuilder()
-            .select('*')
-            .from(this.targetEntity, 'entity')
-            .where('entity.id = $1')
-            .getQuery();
-
-        const existsQuery = `select exists(${select})`;
-
-        const res = await this.db.manager.query(existsQuery, [id]);
-        return res?.[0]?.exists === true;
-    }
-
-    protected get namespace() {
-        return this.db.connection.getMetadata(this.targetEntity).tableName;
     }
 }
