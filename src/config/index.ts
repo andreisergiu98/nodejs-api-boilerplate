@@ -1,6 +1,22 @@
 import cors from '@koa/cors';
+
 import {createDbConfig} from './db';
 import {createRedisConfig} from './redis';
+
+import {checkIfEnvExist} from './utils';
+
+checkIfEnvExist([
+    'PORT',
+    'NODE_ENV',
+
+    'DB',
+    'REDIS',
+    'SESSION_STORAGE',
+
+    'GOOGLE_CLIENT_ID',
+    'GOOGLE_CLIENT_SECRET',
+    'GOOGLE_CLIENT_REDIRECT',
+]);
 
 const isProduction = process.env.NODE_ENV === 'production';
 
@@ -18,7 +34,15 @@ export const config = {
             ...createDbConfig(process.env.DB!, 'default', isProduction),
         },
         redis: {
-            ...createRedisConfig(process.env.SESSION_STORAGE!, 'redis'),
+            ...createRedisConfig(process.env.REDIS!, 'redis'),
         },
+        sessionStorage: {
+            ...createRedisConfig(process.env.SESSION_STORAGE!, 'session storage')
+        },
+    },
+    google: {
+        id: process.env.GOOGLE_CLIENT_ID!,
+        secret: process.env.GOOGLE_CLIENT_SECRET!,
+        redirect: process.env.GOOGLE_CLIENT_REDIRECT!,
     },
 };
