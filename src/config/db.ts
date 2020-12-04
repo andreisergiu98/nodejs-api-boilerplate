@@ -7,10 +7,16 @@ import {AccessRole} from '../modules/access-role';
 import {AccessGroup} from '../modules/access-group';
 import {AccessRolePermissions} from '../modules/access-role-permissions';
 
+import {User} from '../modules/user';
+import {UserSession} from '../modules/user-session';
+
 const models = [
     AccessRole,
     AccessGroup,
     AccessRolePermissions,
+
+    User,
+    UserSession,
 ];
 
 export function createDbConfig(connection: string, name: string, isProduction: boolean) {
