@@ -4,22 +4,28 @@ import {ModelD} from './model-d';
 
 @Entity()
 export class ModelA extends BaseEntity {
+    @PrimaryGeneratedColumn()
     @IsInt()
     @IsOptional()
-    @PrimaryGeneratedColumn()
     id!: number;
 
+    @Column('varchar', {length: 50, unique: true})
     @IsString()
     @Length(1, 50)
-    @Column('varchar', {length: 50, unique: true})
     column1!: string;
 
+    @Column('varchar', {length: 256, nullable: true})
     @IsString()
     @IsOptional()
     @Length(1, 256)
-    @Column('varchar', {length: 256, nullable: true})
     column2!: string | null;
+
+    @Column({nullable: true})
+    @IsInt()
+    @IsOptional()
+    modelDId?: number | null;
 
     @ManyToOne(() => ModelA)
     modelD?: ModelD;
 }
+
