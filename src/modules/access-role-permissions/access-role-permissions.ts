@@ -1,4 +1,4 @@
-import {BaseEntity, Column, Entity, ManyToOne, PrimaryGeneratedColumn, Unique} from 'typeorm';
+import {BaseEntity, Column, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn, Unique} from 'typeorm';
 import {IsBoolean, IsInt, IsOptional} from 'class-validator';
 
 import {AccessRole} from '../access-role';
@@ -41,8 +41,10 @@ export class AccessRolePermissions extends BaseEntity {
     delete!: boolean;
 
     @ManyToOne(() => AccessRole, role => role.permissions)
+    @JoinColumn()
     role?: AccessRole;
 
     @ManyToOne(() => AccessGroup)
+    @JoinColumn()
     group?: AccessGroup;
 }
