@@ -1,10 +1,10 @@
 export class AppError extends Error {
-    code: number;
+    status: number;
     namespace?: string;
 
-    constructor(code: number, message?: string, namespace?: string) {
+    constructor(status: number, message?: string, namespace?: string) {
         super(message);
-        this.code = code;
+        this.status = status;
         this.namespace = namespace;
         // Ensure the name of this error is the same as the class name
         this.name = this.constructor.name;
