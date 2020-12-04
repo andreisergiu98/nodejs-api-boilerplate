@@ -3,35 +3,36 @@ import {validate} from 'class-validator';
 
 import {DbClient} from '../db-client';
 import {AppError} from '../app-error';
-import {parseResourceQuery} from '../resource-query';
+import {ParsedResourceQuery} from '../resource-query';
 
-export async function validatePayload<T>(db: DbClient, targetEntity: EntityTarget<T>, entity?: T) {
-    const name = db.connection.getMetadata(targetEntity).name;
+export async function validatePayload<T>(db: DbClient, targetEntity: EntityTarget<T>, entity?: T, partial = false) {
+    const namespace = db.connection.getMetadata(targetEntity).name;
     if (!entity) {
-        throw new AppError(400, 'Missing payload object', name);
+        throw new AppError(400, 'Missing payload object', namespace);
     }
     const instance = db.manager.create(targetEntity, entity);
-    const errors = await validate(instance);
+    const errors = await validate(instance, {
+        skipMissingProperties: partial,
+    });
     if (errors.length > 0) {
-        throw new AppError(400, errors.join(', '), name);
+        throw new AppError(400, errors.join(', '), namespace);
     }
     return instance;
 }
 
 export async function validateArrayPayload<T>(db: DbClient, targetEntity: EntityTarget<T>, entities?: T[]) {
-    const name = db.connection.getMetadata(targetEntity).name;
+    const namespace = db.connection.getMetadata(targetEntity).name;
     if (!entities) {
-        throw new AppError(400, 'Missing payload object', name);
+        throw new AppError(400, 'Missing payload object', namespace);
     }
     if (!Array.isArray(entities)) {
-        throw new AppError(400, 'Payload is not an array', name);
+        throw new AppError(400, 'Payload is not an array', namespace);
     }
     return Promise.all(entities.map(entity => validatePayload(db, targetEntity, entity)));
 }
 
-export function getFindOneOptions<T>(rawQuery: string, db: DbClient, targetEntity: EntityTarget<T>) {
+export function getFindOneOptions<T>(parsedQuery: ParsedResourceQuery) {
     const findConditions: FindOneOptions<T> | undefined = {};
-    const parsedQuery = parseResourceQuery(rawQuery, db, targetEntity);
 
     if (parsedQuery.select) {
         findConditions.select = parsedQuery.select;
@@ -44,9 +45,8 @@ export function getFindOneOptions<T>(rawQuery: string, db: DbClient, targetEntit
     return findConditions;
 }
 
-export function getFindManyOptions<T>(rawQuery: string, db: DbClient, targetEntity: EntityTarget<T>) {
+export function getFindManyOptions<T>(parsedQuery: ParsedResourceQuery) {
     const findConditions: FindManyOptions<T> = {};
-    const parsedQuery = parseResourceQuery(rawQuery, db, targetEntity);
 
     if (parsedQuery.where) {
         findConditions.where = parsedQuery.where;
