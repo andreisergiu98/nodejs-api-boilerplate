@@ -42,4 +42,12 @@ export class User extends BaseEntity {
     @IsString()
     @MaxLength(50)
     phoneNumber!: string | null;
+
+    @ManyToMany(() => AccessRole, {
+        persistence: false,
+    })
+    @JoinTable({
+        name: 'user_access_roles',
+    })
+    roles?: AccessRole[];
 }
