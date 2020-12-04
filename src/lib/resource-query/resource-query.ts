@@ -12,6 +12,8 @@ interface ResourceQuery {
     relations?: unknown;
 }
 
+export type ParsedResourceQuery = ReturnType<typeof parseResourceQuery>;
+
 export function parseTake<T>(take: unknown, db: DbClient, entity: EntityTarget<T>) {
     // nothing to validate
     if (take == null) return;
