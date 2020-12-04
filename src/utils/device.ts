@@ -5,7 +5,7 @@ export interface Device {
     os: string;
 }
 
-function getInfo(useragent: string): Device {
+export function getDeviceInfo(useragent?: string): Device {
     const parser = new UAParser(useragent);
     const result = parser.getResult();
 
