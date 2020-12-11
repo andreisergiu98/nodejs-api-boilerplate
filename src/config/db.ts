@@ -8,7 +8,7 @@ import {AccessGroup} from '../modules/access-group';
 import {AccessRolePermissions} from '../modules/access-role-permissions';
 
 import {User} from '../modules/user';
-import {UserSession} from '../modules/user-session';
+import {UserSession} from '../modules/user-session/user-session';
 
 const models = [
     AccessRole,

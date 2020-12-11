@@ -1,22 +1,37 @@
 import {AppError} from '../lib/app-error';
 
-export async function catchError(ctx: App.Context, next: () => Promise<void>) {
-    try {
-        await next();
-    } catch (e) {
-        ctx.body = e.message;
-        ctx.status = e.status || 500;
+function getNamespace(ctx: App.Context, e: Error | AppError) {
+    return (e as AppError).namespace || ctx.state.namespace;
+}
 
-        if (ctx.status === 500) {
-            logError(ctx, e);
-            ctx.body = 'Internal Server Error';
-            ctx.app.emit('error', e, ctx);
+export function catchError() {
+    return async function (ctx: App.Context, next: () => Promise<void>) {
+        try {
+            await next();
+        } catch (e) {
+            let message = e.message;
+            const status = e.status || 500;
+            const namespace = getNamespace(ctx, e);
+
+            if (status === 500) {
+                logError(ctx, e);
+                message = 'Internal Server Error';
+                ctx.app.emit('error', e, ctx);
+            }
+
+            ctx.body = {
+                error: true,
+                status,
+                message,
+                namespace,
+            };
+            ctx.status = status;
         }
-    }
+    };
 }
 
 export function logError(ctx: App.Context, e: Error | AppError) {
-    const namespace = (e as AppError).namespace || ctx.state.namespace;
+    const namespace = getNamespace(ctx, e);
     const logger = ctx.log.child({
         name: namespace,
     });
