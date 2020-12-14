@@ -19,4 +19,4 @@ services:
     image: redis:5-alpine
     restart: always
     ports:
-      - 6390:6379
+      - 6505:6379
