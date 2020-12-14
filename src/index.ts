@@ -15,40 +15,40 @@ import {initConnections} from './loader/connections';
 import {routes} from './api';
 
 class Server {
-    readonly app = new Koa();
-    private readonly koaLogger = createKoaLogger();
+	readonly app = new Koa();
+	private readonly koaLogger = createKoaLogger();
 
-    constructor() {
-    }
+	constructor() {
+	}
 
-    private get logger() {
-        return this.koaLogger.logger;
-    }
+	private get logger() {
+		return this.koaLogger.logger;
+	}
 
-    async init() {
-        try {
-            await initConnections();
+	async init() {
+		try {
+			await initConnections();
 
-            this.app.use(this.koaLogger);
+			this.app.use(this.koaLogger);
 
-            this.app.use(catchError());
+			this.app.use(catchError());
 
-            this.app.use(bodyparser());
+			this.app.use(bodyparser());
 
-            this.app.use(cors(config.cors));
+			this.app.use(cors(config.cors));
 
-            this.app.use(conditional());
-            this.app.use(etag());
+			this.app.use(conditional());
+			this.app.use(etag());
 
-            this.app.use(routes);
+			this.app.use(routes);
 
-            this.app.listen(config.node.port);
+			this.app.listen(config.node.port);
 
-            this.logger.info(`Server is running on port ${config.node.port}\n`);
-        } catch (e) {
-            this.logger.error(e);
-        }
-    }
+			this.logger.info(`Server is running on port ${config.node.port}\n`);
+		} catch (e) {
+			this.logger.error(e);
+		}
+	}
 }
 
 export const server = new Server();

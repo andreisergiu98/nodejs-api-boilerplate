@@ -1,65 +1,85 @@
-import {LessThan} from 'typeorm';
+/* eslint-disable @typescript-eslint/naming-convention,camelcase */
+import jwt from 'jsonwebtoken';
 import {TokenSet} from 'openid-client';
 
-import {User} from '../user';
 import {UserSession} from './user-session';
-import {DbClient} from '../../lib/db-client';
 
+import {config} from '../../config';
+import {DbClient} from '../../lib/db-client';
 import {Device} from '../../utils/device';
 
+interface Session {
+	userId: number;
+	sessionId: number;
+	tokenSet: TokenSet;
+}
+
+interface SessionRaw {
+	userId: number;
+	sessionId: number;
+	tokenSet: {
+		scope: string;
+		access_token: string;
+		token_type: string;
+		id_token: string;
+		expires_at: number;
+	};
+}
+
 export class UserSessionService {
-    constructor(
-        private readonly db: DbClient
-    ) {
-    }
+	constructor(
+		private readonly db: DbClient,
+		private readonly jwtSecret = config.session.secret
+	) {
+	}
 
-    async saveToken(userId: number, tokenSet: TokenSet, device?: Device) {
-        const expireDate = new Date((tokenSet.expires_at ?? 0) * 1000);
+	async createSession(userId: number, tokenSet: TokenSet, device: Device) {
+		const session = await this.db.manager.create(UserSession, {
+			userId,
+			enabled: true,
+			deviceOS: device.os,
+			browser: device.browser,
+		});
+		const res = await this.db.manager.insert(UserSession, session);
 
-        const userToken = this.db.manager.create(UserSession, {
-            userId,
-            scope: tokenSet.scope?.split(' ') ?? [],
-            idToken: tokenSet.id_token,
-            expiresAt: expireDate,
-            tokenType: tokenSet.token_type,
-            accessToken: tokenSet.access_token,
+		return this.createSessionToken({
+			userId,
+			tokenSet,
+			sessionId: res.raw[0].id,
+		});
+	}
 
-            deviceOs: device?.os,
-            deviceBrowser: device?.browser,
-        });
-        await this.db.manager.insert(UserSession, userToken);
-    }
+	async reuseSession(sessionId: number, tokenSet: TokenSet) {
+		const session = await this.db.manager.findOne(UserSession, {
+			where: {id: sessionId, enabled: true},
+		});
+		if (!session) {
+			return;
+		}
+		return this.createSessionToken({
+			sessionId,
+			userId: session.userId,
+			tokenSet,
+		});
+	}
 
-    async saveTokenBySub(googleId: string, tokenSet: TokenSet) {
-        const user = await this.db.manager.findOne(User, {
-            where: {googleId},
-        });
-        if (!user) return;
-        await this.saveToken(user.id, tokenSet);
-    }
+	async decodeSessionToken(token: string) {
+		return new Promise((resolve, reject) => {
+			jwt.verify(token, this.jwtSecret, (err, payload) => {
+				if (err) return reject(err);
+				resolve(payload as SessionRaw);
+			});
+		}) as Promise<SessionRaw>;
+	}
 
-    async disableToken(accessToken: string) {
-        await this.db.manager.createQueryBuilder()
-            .update(UserSession)
-            .where('accessToken = :accessToken', {accessToken})
-            .set({enabled: false})
-            .execute();
-    }
+	private async createSessionToken(payload: Session) {
+		delete payload.tokenSet.refresh_token;
 
-    async disableExpired() {
-        const expiredTokens = await this.db.manager.find(UserSession, {
-            where: {
-                enabled: true,
-                expiresAt: LessThan(new Date()),
-            },
-        });
-        if (expiredTokens.length === 0) return;
-
-        const ids = expiredTokens.map(el => el.id);
-        await this.db.manager.createQueryBuilder()
-            .update(UserSession)
-            .whereInIds(ids)
-            .set({enabled: false})
-            .execute();
-    }
+		return new Promise((resolve, reject) => {
+			jwt.sign(payload, this.jwtSecret, (err, token) => {
+				if (err) return reject(err);
+				resolve(token as string);
+			});
+		}) as Promise<string>;
+	}
 }

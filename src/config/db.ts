@@ -11,29 +11,29 @@ import {User} from '../modules/user';
 import {UserSession} from '../modules/user-session/user-session';
 
 const models = [
-    AccessRole,
-    AccessGroup,
-    AccessRolePermissions,
+	AccessRole,
+	AccessGroup,
+	AccessRolePermissions,
 
-    User,
-    UserSession,
+	User,
+	UserSession,
 ];
 
 export function createDbConfig(connection: string, name: string, isProduction: boolean) {
-    const dbUrl = parseUrl(connection);
+	const dbUrl = parseUrl(connection);
 
-    return {
-        name,
-        charset: 'utf8mb4',
-        logging: !isProduction,
-        synchronize: !isProduction,
-        entities: models,
-        namingStrategy: snakeCaseNamingStrategy,
-        type: dbUrl.type,
-        host: dbUrl.hostname,
-        port: dbUrl.port,
-        database: dbUrl.database,
-        username: dbUrl.username,
-        password: dbUrl.password,
-    } as ConnectionOptions;
+	return {
+		name,
+		charset: 'utf8mb4',
+		logging: false,
+		synchronize: !isProduction,
+		entities: models,
+		namingStrategy: snakeCaseNamingStrategy,
+		type: dbUrl.type,
+		host: dbUrl.hostname,
+		port: dbUrl.port,
+		database: dbUrl.database,
+		username: dbUrl.username,
+		password: dbUrl.password,
+	} as ConnectionOptions;
 }

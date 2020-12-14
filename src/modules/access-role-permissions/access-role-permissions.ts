@@ -7,44 +7,44 @@ import {AccessGroup} from '../access-group';
 @Entity()
 @Unique(['roleId', 'groupId'])
 export class AccessRolePermissions extends BaseEntity {
-    @PrimaryGeneratedColumn()
-    @IsInt()
-    @IsOptional()
-    id!: number;
+	@PrimaryGeneratedColumn()
+	@IsInt()
+	@IsOptional()
+	id!: number;
 
-    @Column()
-    @IsInt()
-    roleId!: number;
+	@Column()
+	@IsInt()
+	roleId!: number;
 
-    @Column()
-    @IsInt()
-    groupId!: number;
+	@Column()
+	@IsInt()
+	groupId!: number;
 
-    @Column('boolean', {default: false})
-    @IsBoolean()
-    @IsOptional()
-    read!: boolean;
+	@Column('boolean', {default: false})
+	@IsBoolean()
+	@IsOptional()
+	read!: boolean;
 
-    @Column('boolean', {default: false})
-    @IsBoolean()
-    @IsOptional()
-    create!: boolean;
+	@Column('boolean', {default: false})
+	@IsBoolean()
+	@IsOptional()
+	create!: boolean;
 
-    @Column('boolean', {default: false})
-    @IsBoolean()
-    @IsOptional()
-    update!: boolean;
+	@Column('boolean', {default: false})
+	@IsBoolean()
+	@IsOptional()
+	update!: boolean;
 
-    @Column('boolean', {default: false})
-    @IsBoolean()
-    @IsOptional()
-    delete!: boolean;
+	@Column('boolean', {default: false})
+	@IsBoolean()
+	@IsOptional()
+	delete!: boolean;
 
-    @ManyToOne(() => AccessRole, role => role.permissions)
-    @JoinColumn()
-    role?: AccessRole;
+	@ManyToOne(() => AccessRole, role => role.permissions)
+	@JoinColumn()
+	role?: AccessRole;
 
-    @ManyToOne(() => AccessGroup)
-    @JoinColumn()
-    group?: AccessGroup;
+	@ManyToOne(() => AccessGroup)
+	@JoinColumn()
+	group?: AccessGroup;
 }

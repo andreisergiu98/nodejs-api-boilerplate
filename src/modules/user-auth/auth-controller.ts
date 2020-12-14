@@ -5,176 +5,175 @@ import {DbClient} from '../../lib/db-client';
 
 import {GoogleOpenId} from './google-open-id';
 import {GoogleUserService} from './google-user-service';
-import {UserSessionService} from '../user-session';
 
 import {
-    getAuthStateCookie,
-    setAuthStateCookie,
-    serializeAuthState,
+    clearAuthStateCookie,
     deserializeAuthState,
+    getAuthStateCookie,
+    serializeAuthState,
+    setAuthStateCookie,
 } from './auth-state';
-import {
-    getSessionCookie,
-    setSessionCookie,
-    serializeSession,
-    clearSessionCookie,
-    deserializeSession,
-} from './auth-session';
+import {getSessionCookie, setSessionCookie} from './auth-session';
+
 import {AppError} from '../../lib/app-error';
 import {getDeviceInfo} from '../../utils/device';
+import {UserSessionService} from '../user-session';
 
 interface AuthOptions {
-    whitelist?: string[];
+	whitelist?: string[];
 }
 
 export class LoginController {
-    private readonly router = new Router();
-    private readonly whitelist: string[];
+	private readonly router = new Router();
+	private readonly whitelist: string[];
 
-    private readonly googleOpenId = new GoogleOpenId();
-    private readonly googleUserService;
-    private readonly userSessionService;
+	private readonly googleOpenId = new GoogleOpenId();
+	private readonly googleUserService;
 
-    private readonly namespace = 'auth';
+	private readonly userSessionService;
 
-    constructor(
-        private readonly db: DbClient,
-        options?: AuthOptions
-    ) {
-        this.googleUserService = new GoogleUserService(db);
-        this.userSessionService = new UserSessionService(db);
+	private readonly namespace = 'auth';
 
-        this.whitelist = options?.whitelist ?? [];
+	constructor(
+		private readonly db: DbClient,
+		options?: AuthOptions
+	) {
+		this.googleUserService = new GoogleUserService(db);
+		this.userSessionService = new UserSessionService(db);
 
-        this.router.use(this.mountNamespace);
+		this.whitelist = options?.whitelist ?? [];
 
-        this.router.get('/login', this.login);
-        this.router.get('/logout', this.logout);
-        this.router.get('/callback', this.callback);
-    }
+		this.router.use(this.mountNamespace);
 
-    routes = () => {
-        return this.router.routes();
-    };
+		this.router.get('/login', this.login);
+		this.router.get('/logout', this.logout);
+		this.router.get('/callback', this.callback);
+		this.router.get('/silent-callback', this.silentCallback);
+	}
 
-    verifySession = async (ctx: App.Context, next: () => Promise<void>) => {
-        if (this.whitelist.includes(ctx.path)) {
-            return next();
-        }
+	routes = () => {
+		return this.router.routes();
+	};
 
-        const sessionCookie = getSessionCookie(ctx);
+	authenticateUser = async (ctx: App.Context, next: () => Promise<void>) => {
+		if (this.whitelist.includes(ctx.path)) {
+			return next();
+		}
 
-        if (!sessionCookie) {
-            throw new AppError(401, 'Unauthorized', this.namespace);
-        }
+		const session = await this.validateSession(ctx);
+		const tokenSet = new TokenSet(session.tokenSet);
 
-        const session = deserializeSession(sessionCookie);
+		if (tokenSet.expired()) {
+			throw new AppError(401, 'Session has expired', this.namespace);
+		}
 
-        let tokenSet;
-        try {
-            tokenSet = new TokenSet(session.tokenSet);
-        } catch (e) {
-            clearSessionCookie(ctx);
-            throw new AppError(401, 'Session might be tampered', this.namespace);
-        }
+		const googleUser = tokenSet.claims();
 
-        try {
-            if (tokenSet.expired()) {
-                tokenSet = await this.refreshToken(ctx, tokenSet);
-            }
-        } catch (e) {
-            clearSessionCookie(ctx);
-            throw new AppError(401, 'Session is expired', this.namespace);
-        }
+		ctx.state.session = {
+			userId: session.userId,
+			googleId: googleUser.sub,
+			sessionId: session.sessionId,
+			tokenSet,
+		};
 
-        const user = tokenSet.claims();
+		return next();
+	};
 
-        ctx.state.session = {
-            user: {
-                sub: user.sub,
-                email: user.email!,
-            },
-            tokenSet,
-        };
+	private login = async (ctx: App.Context) => {
+		const backToPath = (ctx.query.backTo as string) || '/';
+		const silent = ctx.query.silent === 'true';
 
-        return next();
-    };
+		const {redirectUrl, codeVerifier} = await this.googleOpenId.createAuthUrl(silent);
 
-    private login = async (ctx: App.Context) => {
-        const backToPath = (ctx.query.backTo as string) || '/';
+		const state = serializeAuthState({backToPath, codeVerifier});
 
-        const state = serializeAuthState({
-            backToPath,
-        });
+		setAuthStateCookie(ctx, state);
+		ctx.redirect(redirectUrl);
+	};
 
-        const authUrl = await this.googleOpenId.getAuthUrl(state);
+	private callback = async (ctx: App.Context) => {
+		const state = getAuthStateCookie(ctx);
 
-        setAuthStateCookie(ctx, state);
-        ctx.redirect(authUrl);
-    };
+		const {backToPath, codeVerifier} = deserializeAuthState(state);
 
-    private callback = async (ctx: App.Context) => {
-        const existingSessionCookie = getSessionCookie(ctx);
+		const client = await this.googleOpenId.getClient();
+		const params = client.callbackParams(ctx.req);
 
-        if (existingSessionCookie) {
-            const {tokenSet} = deserializeSession(existingSessionCookie);
-            await this.userSessionService.disableToken(tokenSet.access_token);
-        }
+		const tokenSet = await this.googleOpenId.callback(params, codeVerifier);
+		const userInfo = await client.userinfo(tokenSet);
+		const user = await this.googleUserService.findUserOrCreate(userInfo, tokenSet);
 
-        const state = getAuthStateCookie(ctx);
+		const device = getDeviceInfo(ctx.get('user-agent'));
+		const sessionToken = await this.userSessionService.createSession(user.id, tokenSet, device);
 
-        const {backToPath} = deserializeAuthState(state);
-        const client = await this.googleOpenId.getClient();
+		setSessionCookie(ctx, sessionToken);
+		clearAuthStateCookie(ctx);
 
-        const params = client.callbackParams(ctx.req);
+		ctx.redirect(backToPath);
+	};
 
-        const tokenSet = await this.googleOpenId.getTokens(params, state);
+	private silentCallback = async (ctx: App.Context) => {
+		let status = 200;
 
-        const userInfo = await client.userinfo(tokenSet);
+		try {
+			const session = await this.validateSession(ctx);
+			const state = getAuthStateCookie(ctx);
 
-        const user = await this.googleUserService.findUserOrCreate(userInfo, tokenSet);
+			const {codeVerifier} = deserializeAuthState(state);
 
-        const deviceInfo = getDeviceInfo(ctx.get('user-agent'));
-        await this.userSessionService.saveToken(user.id, tokenSet, deviceInfo);
+			const client = await this.googleOpenId.getClient();
+			const params = client.callbackParams(ctx.req);
 
-        const session = serializeSession({tokenSet});
-        setSessionCookie(ctx, session);
+			const tokenSet = await this.googleOpenId.silentCallback(params, codeVerifier);
 
-        ctx.redirect(backToPath);
-    };
+			const sessionToken = await this.userSessionService.reuseSession(session.sessionId, tokenSet);
 
-    private logout = async (ctx: App.Context) => {
-        const client = await this.googleOpenId.getClient();
-        const tokenSet = ctx.state.session.tokenSet;
+			if (!sessionToken) {
+				throw new AppError(401, 'Session has expired', this.namespace);
+			}
 
-        if (!tokenSet.access_token) {
-            ctx.throw(401);
-        }
+			// @ts-ignore
+			setSessionCookie(ctx, sessionToken);
+			clearAuthStateCookie(ctx);
+		} catch (e) {
+			status = e.status || 401;
+		}
 
-        await client.revoke(tokenSet.access_token);
-        await this.userSessionService.disableToken(tokenSet.access_token!);
+		ctx.body = `
+            <html>
+            <head>
+                <script>parent.postMessage({type: 'SILENT_REFRESH', ok: ${status === 200}}, '${ctx.headers['referer']}')</script>
+            </head>
+            <body></body>
+            </html> 
+        `;
+		ctx.status = status;
+	};
 
-        ctx.status = 204;
-    };
+	private logout = async (ctx: App.Context) => {
 
-    private refreshToken = async (ctx: App.Context, tokenSet: TokenSet) => {
-        await this.userSessionService.disableToken(tokenSet.access_token!);
+	};
 
-        const client = await this.googleOpenId.getClient();
+	private validateSession = async (ctx: App.Context) => {
+		const sessionToken = getSessionCookie(ctx);
 
-        const refreshedTokenSet = await client.refresh(tokenSet);
-        const user = refreshedTokenSet.claims();
+		if (!sessionToken) {
+			throw new AppError(401, 'Unauthorized', this.namespace);
+		}
 
-        await this.userSessionService.saveTokenBySub(user.sub, refreshedTokenSet);
+		let session;
 
-        const refreshedSession = serializeSession({tokenSet: refreshedTokenSet});
-        setSessionCookie(ctx, refreshedSession);
+		try {
+			session = await this.userSessionService.decodeSessionToken(sessionToken);
+		} catch (e) {
+			throw new AppError(401, 'Session is tampered', this.namespace);
+		}
 
-        return refreshedTokenSet;
-    };
+		return session;
+	};
 
-    private mountNamespace = (ctx: App.Context, next: () => Promise<void>) => {
-        ctx.state.namespace = 'auth';
-        return next();
-    };
+	private mountNamespace = (ctx: App.Context, next: () => Promise<void>) => {
+		ctx.state.namespace = 'auth';
+		return next();
+	};
 }
