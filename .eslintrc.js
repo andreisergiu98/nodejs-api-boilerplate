@@ -1,42 +1,43 @@
 module.exports = {
     "env": {
-        "es6": true
+        "node": true,
+        "es2020": true,
     },
     "parser": "@typescript-eslint/parser",
     "parserOptions": {
         "project": "./tsconfig.json",
-        "sourceType": "module"
+        "sourceType": "module",
     },
     "plugins": [
         "@typescript-eslint",
+        "ban",
         "import",
-        "ban"
     ],
     "rules": {
-        "@typescript-eslint/array-type": ["error", {"default": "array-simple"}],
-        "@typescript-eslint/ban-ts-comment": "error",
-        "@typescript-eslint/ban-types": "error",
-        "@typescript-eslint/naming-convention": "error",
-        "@typescript-eslint/consistent-type-assertions": "error",
-        "@typescript-eslint/consistent-type-definitions": "error",
-        "@typescript-eslint/explicit-member-accessibility": ["error", {
-            "accessibility": "no-public"
+        "@typescript-eslint/array-type": ["warn", {"default": "array-simple"}],
+        "@typescript-eslint/ban-ts-comment": "warn",
+        "@typescript-eslint/ban-types": "warn",
+        "@typescript-eslint/naming-convention": "warn",
+        "@typescript-eslint/consistent-type-assertions": "warn",
+        "@typescript-eslint/consistent-type-definitions": "warn",
+        "@typescript-eslint/explicit-member-accessibility": ["warn", {
+            "accessibility": "no-public",
         }],
-        "@typescript-eslint/member-delimiter-style": ["error", {
+        "@typescript-eslint/member-delimiter-style": ["warn", {
             "multiline": {
                 "delimiter": "semi",
-                "requireLast": true
+                "requireLast": true,
             },
             "singleline": {
                 "delimiter": "semi",
-                "requireLast": false
-            }
+                "requireLast": false,
+            },
         }],
-        "@typescript-eslint/no-explicit-any": "error",
-        "@typescript-eslint/quotes": ["error", "single", {"avoidEscape": true}],
-        "@typescript-eslint/semi": ["error", "always"],
-        "@typescript-eslint/triple-slash-reference": "error",
-        "ban/ban": ["error",
+        "@typescript-eslint/no-explicit-any": "warn",
+        "@typescript-eslint/quotes": ["warn", "single", {"avoidEscape": true}],
+        "@typescript-eslint/semi": ["warn", "always"],
+        "@typescript-eslint/triple-slash-reference": "warn",
+        "ban/ban": ["warn",
             {"name": ["it", "skip"]},
             {"name": ["it", "only"]},
             {"name": ["it", "async", "skip"]},
@@ -47,34 +48,34 @@ module.exports = {
             {"name": "parseFloat", "message": "tsstyle#type-coercion"},
             {"name": "Array", "message": "tsstyle#array-constructor"},
         ],
-        "camelcase": "error",
-        "comma-dangle": ["error", {
+        "camelcase": "warn",
+        "comma-dangle": ["warn", {
             "objects": "always-multiline",
             "arrays": "always-multiline",
             "imports": "always-multiline",
             "functions": "never",
         }],
-        "curly": ["error", "multi-line"],
-        "default-case": "error",
-        "eqeqeq": ["error", "smart"],
-        "guard-for-in": "error",
-        "import/no-default-export": "error",
-        "import/no-deprecated": "error",
-        "new-parens": "error",
-        "no-caller": "error",
-        "no-cond-assign": "error",
-        "no-debugger": "error",
-        "no-new-wrappers": "error",
+        "curly": ["warn", "multi-line"],
+        "default-case": "warn",
+        "eqeqeq": ["warn", "smart"],
+        "guard-for-in": "warn",
+        "import/no-deprecated": "warn",
+        "jsx-quotes": ["warn", "prefer-double"],
+        "new-parens": "warn",
+        "no-caller": "warn",
+        "no-cond-assign": "warn",
+        "no-debugger": "warn",
+        "no-new-wrappers": "warn",
         "no-redeclare": "error",
-        "no-return-await": "error",
+        "no-return-await": "warn",
         "no-throw-literal": "error",
-        "no-underscore-dangle": "error",
+        "no-underscore-dangle": "warn",
         "no-unsafe-finally": "error",
-        "no-unused-expressions": "error",
-        "no-unused-labels": "error",
+        "no-unused-expressions": "warn",
+        "no-unused-labels": "warn",
         "no-var": "error",
-        "object-shorthand": "error",
-        "prefer-const": "error",
+        "object-shorthand": "warn",
+        "prefer-const": "warn",
         "radix": "error",
         "use-isnan": "error",
     }
